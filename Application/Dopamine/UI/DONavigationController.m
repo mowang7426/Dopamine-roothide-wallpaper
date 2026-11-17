@@ -10,12 +10,64 @@
 #import "DOModalBackAction.h"
 #import "DOGlobalAppearance.h"
 #import "DOThemeManager.h"
+#import <Photos/Photos.h>
+
+static NSString * const DOWallpaperPathName = @"DopamineWallpaper.png";
+
+@interface DONavigationController (DOWallpaper)
+- (NSString *)wallpaperPath;
+- (void)reloadWallpaper;
+- (void)showWallpaperAlert:(NSString *)message;
+@end
+
+@interface DOWallpaperPickerDelegate : NSObject <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
+@property (nonatomic, weak) DONavigationController *navigationController;
+@end
+
+@implementation DOWallpaperPickerDelegate
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker
+{
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<NSString *, id> *)info
+{
+    UIImage *image = info[UIImagePickerControllerEditedImage] ?: info[UIImagePickerControllerOriginalImage];
+    if (image) {
+        // Bound the stored bitmap while preserving orientation and aspect ratio.
+        CGFloat maxPixels = 4096.0;
+        CGFloat scale = MIN(1.0, maxPixels / MAX(image.size.width, image.size.height));
+        CGSize size = CGSizeMake(MAX(1.0, floor(image.size.width * scale)),
+                                 MAX(1.0, floor(image.size.height * scale)));
+        UIGraphicsBeginImageContextWithOptions(size, NO, 1.0);
+        [image drawInRect:(CGRect){CGPointZero, size}];
+        UIImage *normalized = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        NSData *data = UIImagePNGRepresentation(normalized);
+        NSString *path = [self.navigationController wallpaperPath];
+        BOOL saved = data != nil && [data writeToFile:path atomically:YES];
+        if (saved) {
+            [self.navigationController reloadWallpaper];
+        } else {
+            [self.navigationController showWallpaperAlert:@"无法保存壁纸，请检查存储空间后重试。"];
+        }
+    } else {
+        [self.navigationController showWallpaperAlert:@"无法读取所选图片。"];
+    }
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+@end
+
+static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 
 @interface DONavigationController ()
 
 @property (nonatomic) UIImageView *backgroundImageView;
 @property (nonatomic) DOMainViewController *mainView;
 @property (nonatomic) DOModalBackAction *backAction;
+@property (nonatomic) UIImage *defaultBackgroundImage;
 
 @end
 
@@ -38,10 +90,11 @@
 - (void)setupBackground
 {
     DOTheme *theme = [[DOThemeManager sharedInstance] enabledTheme];
-    
+    self.defaultBackgroundImage = [theme image];
+
     self.view.backgroundColor = [UIColor blackColor];
     self.backgroundImageView = [[UIImageView alloc] init];
-    self.backgroundImageView.image = [theme image];
+    self.backgroundImageView.image = [self savedWallpaper] ?: self.defaultBackgroundImage;
     self.backgroundImageView.contentMode = UIViewContentModeScaleAspectFill;
     self.backgroundImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.backgroundImageView.userInteractionEnabled = NO;
@@ -70,6 +123,68 @@
         [self.backAction.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [self.backAction.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
     ]];
+}
+
+- (NSString *)wallpaperPath
+{
+    NSArray *directories = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    return [[directories.firstObject stringByAppendingPathComponent:DOWallpaperPathName] copy];
+}
+
+- (UIImage *)savedWallpaper
+{
+    return [UIImage imageWithContentsOfFile:[self wallpaperPath]];
+}
+
+- (void)reloadWallpaper
+{
+    self.backgroundImageView.image = [self savedWallpaper] ?: self.defaultBackgroundImage;
+}
+
+- (void)showWallpaperAlert:(NSString *)message
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"壁纸"
+            message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+        [self.topViewController presentViewController:alert animated:YES completion:nil];
+    });
+}
+
+- (void)chooseWallpaper
+{
+    PHAuthorizationStatus status = [PHPhotoLibrary authorizationStatus];
+    if (status == PHAuthorizationStatusDenied || status == PHAuthorizationStatusRestricted) {
+        [self showWallpaperAlert:@"无法访问照片，请在系统设置中允许照片权限。"];
+        return;
+    }
+    if (status == PHAuthorizationStatusNotDetermined) {
+        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus newStatus) {
+            if (newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited) {
+                dispatch_async(dispatch_get_main_queue(), ^{ [self chooseWallpaper]; });
+            }
+        }];
+        return;
+    }
+
+    UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+    picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+    picker.allowsEditing = YES;
+    gWallpaperPickerDelegate = [[DOWallpaperPickerDelegate alloc] init];
+    gWallpaperPickerDelegate.navigationController = self;
+    picker.delegate = gWallpaperPickerDelegate;
+    [self.topViewController presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)resetWallpaper
+{
+    NSError *error = nil;
+    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:[self wallpaperPath]];
+    if (exists && ![[NSFileManager defaultManager] removeItemAtPath:[self wallpaperPath] error:&error]) {
+        [self showWallpaperAlert:@"无法恢复默认背景，请稍后重试。"];
+        return;
+    }
+    [self reloadWallpaper];
 }
 
 - (void)setBackgroundDimmed:(BOOL)dimmed
