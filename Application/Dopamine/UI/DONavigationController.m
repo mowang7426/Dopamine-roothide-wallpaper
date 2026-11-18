@@ -33,13 +33,15 @@ static NSString * const DOWallpaperPathName = @"DopamineWallpaper.png";
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<NSString *, id> *)info
 {
-    UIImage *image = info[UIImagePickerControllerEditedImage] ?: info[UIImagePickerControllerOriginalImage];
+    UIImage *image = info[UIImagePickerControllerOriginalImage];
     if (image) {
-        // Bound the stored bitmap while preserving orientation and aspect ratio.
+        // UIImage drawing applies rotation/mirroring; use oriented pixel dimensions,
+        // not points, and render at scale 1 so the longest stored edge is <= 4096 px.
         CGFloat maxPixels = 4096.0;
-        CGFloat scale = MIN(1.0, maxPixels / MAX(image.size.width, image.size.height));
-        CGSize size = CGSizeMake(MAX(1.0, floor(image.size.width * scale)),
-                                 MAX(1.0, floor(image.size.height * scale)));
+        CGSize pixelSize = CGSizeMake(image.size.width * image.scale, image.size.height * image.scale);
+        CGFloat scale = MIN(1.0, maxPixels / MAX(pixelSize.width, pixelSize.height));
+        CGSize size = CGSizeMake(MAX(1.0, floor(pixelSize.width * scale)),
+                                 MAX(1.0, floor(pixelSize.height * scale)));
         UIGraphicsBeginImageContextWithOptions(size, NO, 1.0);
         [image drawInRect:(CGRect){CGPointZero, size}];
         UIImage *normalized = UIGraphicsGetImageFromCurrentImageContext();
@@ -68,6 +70,8 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 @property (nonatomic) DOMainViewController *mainView;
 @property (nonatomic) DOModalBackAction *backAction;
 @property (nonatomic) UIImage *defaultBackgroundImage;
+@property (nonatomic) NSLayoutConstraint *backgroundTopConstraint;
+@property (nonatomic) NSLayoutConstraint *backgroundBottomConstraint;
 
 @end
 
@@ -94,8 +98,8 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 
     self.view.backgroundColor = [UIColor blackColor];
     self.backgroundImageView = [[UIImageView alloc] init];
-    self.backgroundImageView.image = [self savedWallpaper] ?: self.defaultBackgroundImage;
-    self.backgroundImageView.contentMode = UIViewContentModeScaleAspectFill;
+    self.backgroundImageView.backgroundColor = [UIColor blackColor];
+    self.backgroundImageView.clipsToBounds = YES;
     self.backgroundImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.backgroundImageView.userInteractionEnabled = NO;
     self.backgroundImageView.layer.zPosition = -1;
@@ -105,9 +109,10 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
     [NSLayoutConstraint activateConstraints:@[
         [self.backgroundImageView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.backgroundImageView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.backgroundImageView.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:-100],
-        [self.backgroundImageView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:100],
+        (self.backgroundTopConstraint = [self.backgroundImageView.topAnchor constraintEqualToAnchor:self.view.topAnchor]),
+        (self.backgroundBottomConstraint = [self.backgroundImageView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor]),
     ]];
+    [self reloadWallpaper];
 
     self.backAction = [[DOModalBackAction alloc] initWithAction:^{
         [self popViewControllerAnimated:YES];
@@ -138,7 +143,15 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 
 - (void)reloadWallpaper
 {
-    self.backgroundImageView.image = [self savedWallpaper] ?: self.defaultBackgroundImage;
+    UIImage *wallpaper = [self savedWallpaper];
+    BOOL hasWallpaper = wallpaper != nil;
+    self.backgroundImageView.image = wallpaper ?: self.defaultBackgroundImage;
+    self.backgroundImageView.contentMode = hasWallpaper ? UIViewContentModeScaleAspectFit : UIViewContentModeScaleAspectFill;
+    self.backgroundImageView.clipsToBounds = hasWallpaper;
+    // Custom photos fit the visible view. Keep the theme's original overscan.
+    self.backgroundTopConstraint.constant = hasWallpaper ? 0 : -100;
+    self.backgroundBottomConstraint.constant = hasWallpaper ? 0 : 100;
+    [self.view setNeedsLayout];
 }
 
 - (void)showWallpaperAlert:(NSString *)message
@@ -169,7 +182,7 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 
     UIImagePickerController *picker = [[UIImagePickerController alloc] init];
     picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-    picker.allowsEditing = YES;
+    picker.allowsEditing = NO;
     gWallpaperPickerDelegate = [[DOWallpaperPickerDelegate alloc] init];
     gWallpaperPickerDelegate.navigationController = self;
     picker.delegate = gWallpaperPickerDelegate;

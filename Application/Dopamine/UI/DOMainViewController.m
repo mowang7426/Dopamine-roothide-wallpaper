@@ -92,10 +92,10 @@
         [UIAction actionWithTitle:DOLocalizedString(@"Menu_Settings_Title") image:[UIImage systemImageNamed:@"gearshape" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"settings" handler:^(__kindof UIAction * _Nonnull action) {
             [self.navigationController pushViewController:[[DOSettingsController alloc] init] animated:YES];
         }],
-        [UIAction actionWithTitle:@"Choose Wallpaper" image:[UIImage systemImageNamed:@"photo" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"choose-wallpaper" handler:^(__kindof UIAction * _Nonnull action) {
+        [UIAction actionWithTitle:@"选择壁纸" image:[UIImage systemImageNamed:@"photo" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"choose-wallpaper" handler:^(__kindof UIAction * _Nonnull action) {
             [(DONavigationController *)self.navigationController chooseWallpaper];
         }],
-        [UIAction actionWithTitle:@"Restore Default Background" image:[UIImage systemImageNamed:@"arrow.counterclockwise" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"reset-wallpaper" handler:^(__kindof UIAction * _Nonnull action) {
+        [UIAction actionWithTitle:@"恢复默认背景" image:[UIImage systemImageNamed:@"arrow.counterclockwise" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"reset-wallpaper" handler:^(__kindof UIAction * _Nonnull action) {
             [(DONavigationController *)self.navigationController resetWallpaper];
         }],
         [UIAction actionWithTitle:DOLocalizedString(@"Menu_Restart_SpringBoard_Title") image:[UIImage systemImageNamed:@"arrow.clockwise" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"respring" handler:^(__kindof UIAction * _Nonnull action) {
