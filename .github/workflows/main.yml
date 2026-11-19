@@ -12,6 +12,14 @@ on:
     paths-ignore:
       - ".gitignore"
   workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Build host (Intel fallback when ARM runners are unavailable)'
+        type: choice
+        default: macos-latest
+        options:
+          - macos-latest
+          - macos-15-intel
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-latest' }}
     steps:
       - name: Xcode Setup
         uses: maxim-lobanov/setup-xcode@v1
@@ -60,8 +68,9 @@ jobs:
           set -x
           git clone https://github.com/CRKatri/trustcache
           cd trustcache
-          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
-          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
+          HOST_ARCH="$(uname -m)"
+          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch $HOST_ARCH"
+          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch $HOST_ARCH"
           gmake -j$(sysctl -n hw.logicalcpu) OPENSSL=1
           sudo cp trustcache /opt/procursus/bin/
 
