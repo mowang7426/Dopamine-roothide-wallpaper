@@ -46,6 +46,8 @@
     [self lockMutex];
         
     self.didExpand = TRUE;
+    // Only the idle wallpaper button is transparent, never the expanded log panel.
+    self.backgroundColor = [DOThemeManager menuColorWithAlpha:1.0];
 
     UIWindow *window = [[UIApplication sharedApplication] keyWindow];
 

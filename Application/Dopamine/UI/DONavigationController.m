@@ -67,6 +67,7 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 @interface DONavigationController ()
 
 @property (nonatomic) UIImageView *backgroundImageView;
+@property (nonatomic, readwrite) BOOL customWallpaperActive;
 @property (nonatomic) DOMainViewController *mainView;
 @property (nonatomic) DOModalBackAction *backAction;
 @property (nonatomic) UIImage *defaultBackgroundImage;
@@ -145,6 +146,8 @@ static DOWallpaperPickerDelegate *gWallpaperPickerDelegate;
 {
     UIImage *wallpaper = [self savedWallpaper];
     BOOL hasWallpaper = wallpaper != nil;
+    self.customWallpaperActive = hasWallpaper;
+    [self.mainView refreshWallpaperPanelAppearance];
     self.backgroundImageView.image = wallpaper ?: self.defaultBackgroundImage;
     self.backgroundImageView.contentMode = hasWallpaper ? UIViewContentModeScaleAspectFit : UIViewContentModeScaleAspectFill;
     self.backgroundImageView.clipsToBounds = hasWallpaper;

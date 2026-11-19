@@ -14,12 +14,14 @@
 #import "DOUpdateViewController.h"
 #import "DOLogCrashViewController.h"
 #import "DONavigationController.h"
+#import "DOThemeManager.h"
 #import <pthread.h>
 #import <sys/sysctl.h>
 #import <libjailbreak/libjailbreak.h>
 
 @interface DOMainViewController ()
 
+@property DOActionMenuView *actionMenuView;
 @property DOJailbreakButton *jailbreakBtn;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
 @property DOActionMenuButton *updateButton;
@@ -33,6 +35,18 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self setupStack];
+    [self refreshWallpaperPanelAppearance];
+}
+
+- (void)refreshWallpaperPanelAppearance
+{
+    BOOL hasWallpaper = [(DONavigationController *)self.navigationController customWallpaperActive];
+    UIColor *panelColor = hasWallpaper ? [UIColor clearColor] : [DOThemeManager menuColorWithAlpha:1.0];
+    self.actionMenuView.backgroundColor = panelColor;
+    // The expanded jailbreak/log panel must keep its readable theme background.
+    if (!self.jailbreakBtn.didExpand) {
+        self.jailbreakBtn.backgroundColor = panelColor;
+    }
 }
 
 -(void)setupStack
@@ -113,6 +127,7 @@
         }]
     ] delegate:self];
     
+    self.actionMenuView = actionView;
     [stackView addArrangedSubview: actionView];
 
     [NSLayoutConstraint activateConstraints:@[

@@ -15,6 +15,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface DONavigationController : UINavigationController <UINavigationControllerDelegate>
 
+@property (nonatomic, readonly) BOOL customWallpaperActive;
+
 - (void)chooseWallpaper;
 - (void)resetWallpaper;
 
