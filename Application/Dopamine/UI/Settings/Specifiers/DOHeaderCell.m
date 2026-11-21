@@ -20,10 +20,27 @@
         titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         
         [self.contentView addSubview:titleLabel];
+        titleLabel.adjustsFontSizeToFitWidth = YES;
+        titleLabel.minimumScaleFactor = 0.7;
+
+        // Explicit navigation for dashboard destinations and nested settings alike.
+        UIButton *backButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        backButton.translatesAutoresizingMaskIntoConstraints = NO;
+        [backButton setTitle:@"返回" forState:UIControlStateNormal];
+        [backButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        backButton.accessibilityHint = @"返回上一页；设置或关于首页返回主界面";
+        [backButton addTarget:self action:@selector(returnToPreviousPage) forControlEvents:UIControlEventTouchUpInside];
+        [self.contentView addSubview:backButton];
 
         [NSLayoutConstraint activateConstraints:@[
+            [backButton.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:8],
+            [backButton.centerYAnchor constraintEqualToAnchor:titleLabel.centerYAnchor],
+            [backButton.widthAnchor constraintEqualToConstant:44],
+            [backButton.heightAnchor constraintEqualToConstant:44],
             [titleLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-3],
-            [titleLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor]
+            [titleLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
+            [titleLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:backButton.trailingAnchor constant:4],
+            [titleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentView.trailingAnchor constant:-56]
         ]];
 
         UIView *border = [[UIView alloc] init];
@@ -39,6 +56,18 @@
         ]];
     }
     return self;
+}
+
+- (void)returnToPreviousPage
+{
+    UIResponder *responder = self.nextResponder;
+    while (responder && ![responder isKindOfClass:UIViewController.class]) {
+        responder = responder.nextResponder;
+    }
+    if ([responder isKindOfClass:UIViewController.class]) {
+        UIViewController *controller = (UIViewController *)responder;
+        [controller.navigationController popViewControllerAnimated:YES];
+    }
 }
 
 - (CGFloat)preferredHeightForWidth:(CGFloat)width
