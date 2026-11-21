@@ -104,7 +104,7 @@
     BOOL wallpaper = [(DONavigationController *)self.navigationController customWallpaperActive];
     BOOL reduceTransparency = UIAccessibilityIsReduceTransparencyEnabled();
     // Actual translucent UIKit views, never a screenshot or a full-screen veil.
-    CGFloat alpha = reduceTransparency ? 0.97 : (wallpaper ? 0.34 : 0.78);
+    CGFloat alpha = reduceTransparency ? 1.0 : (wallpaper ? 0.34 : 0.78);
     for (UIView *panel in self.dashboardPanels) {
         panel.backgroundColor = [UIColor colorWithWhite:1 alpha:alpha];
         panel.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.32].CGColor;
@@ -113,6 +113,8 @@
         self.jailbreakBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:alpha];
         self.jailbreakBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.32].CGColor;
     }
+    [self setNeedsStatusBarAppearanceUpdate];
+    [self.navigationController setNeedsStatusBarAppearanceUpdate];
 }
 
 - (UIStackView *)dashboardMetric:(NSString *)title value:(UILabel *)value
@@ -386,14 +388,25 @@
     ];
     [NSLayoutConstraint activateConstraints:self.jailbreakButtonConstraints];
     [self refreshDashboardValues];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refreshWallpaperPanelAppearance) name:UIAccessibilityReduceTransparencyStatusDidChangeNotification object:nil];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(stopDashboardTimer) name:UIApplicationDidEnterBackgroundNotification object:nil];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(startDashboardTimer) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(dashboardNotification:) name:UIAccessibilityReduceTransparencyStatusDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(dashboardNotification:) name:UIApplicationDidEnterBackgroundNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(dashboardNotification:) name:UIApplicationDidBecomeActiveNotification object:nil];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1 * NSEC_PER_SEC), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
         BOOL environmentUpdate = [[DOUIManager sharedInstance] environmentUpdateAvailable];
         BOOL update = environmentUpdate || [[DOUIManager sharedInstance] isUpdateAvailable];
         if (update) dispatch_async(dispatch_get_main_queue(), ^{ [weakSelf setupUpdateAvailable:environmentUpdate]; });
     });
+}
+
+- (void)dashboardNotification:(NSNotification *)notification
+{
+    if ([notification.name isEqualToString:UIAccessibilityReduceTransparencyStatusDidChangeNotification]) {
+        [self refreshWallpaperPanelAppearance];
+    } else if ([notification.name isEqualToString:UIApplicationDidEnterBackgroundNotification]) {
+        [self stopDashboardTimer];
+    } else if ([notification.name isEqualToString:UIApplicationDidBecomeActiveNotification]) {
+        [self startDashboardTimer];
+    }
 }
 
 - (void)refreshDashboardValues
