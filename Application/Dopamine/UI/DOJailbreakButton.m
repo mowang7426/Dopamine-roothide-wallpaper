@@ -11,7 +11,30 @@
 #import "DOGlobalAppearance.h"
 #import "DOThemeManager.h"
 
+@interface DOJailbreakButton ()
+@property (nonatomic) DOLightGlassView *glassView;
+@end
+
 @implementation DOJailbreakButton
+
+- (void)setLightGlassAppearance:(BOOL)lightGlassAppearance
+{
+    // Expansion is one-way: an accessibility/wallpaper refresh cannot blur logs.
+    _lightGlassAppearance = lightGlassAppearance && !self.didExpand;
+    self.button.lightGlassAppearance = _lightGlassAppearance;
+    self.layer.cornerRadius = _lightGlassAppearance ? 20 : 14;
+    self.backgroundColor = _lightGlassAppearance ? UIColor.clearColor : [DOThemeManager menuColorWithAlpha:1.0];
+    if (_lightGlassAppearance && !self.glassView) {
+        self.glassView = [[DOLightGlassView alloc] initWithFrame:self.bounds];
+        self.glassView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [self insertSubview:self.glassView atIndex:0];
+    }
+    if (!_lightGlassAppearance) {
+        [self.glassView removeFromSuperview];
+        self.glassView = nil;
+    }
+}
+
 
 - (instancetype)initWithAction:(UIAction *)actions
 {
@@ -46,8 +69,8 @@
     [self lockMutex];
         
     self.didExpand = TRUE;
-    // Only the idle wallpaper button is transparent, never the expanded log panel.
-    self.backgroundColor = [DOThemeManager menuColorWithAlpha:1.0];
+    // Remove the local glass before expanding into the original opaque log panel.
+    self.lightGlassAppearance = NO;
 
     UIWindow *window = [[UIApplication sharedApplication] keyWindow];
 

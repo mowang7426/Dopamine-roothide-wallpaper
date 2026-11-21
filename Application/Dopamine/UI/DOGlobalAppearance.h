@@ -37,4 +37,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+// A card-local backdrop; never installed over the wallpaper itself.
+@interface DOLightGlassView : UIView
+@end
+
 NS_ASSUME_NONNULL_END

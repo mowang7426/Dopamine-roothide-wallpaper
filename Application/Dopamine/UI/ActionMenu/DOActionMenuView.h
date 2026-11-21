@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface DOActionMenuView : UIView
 
+@property (nonatomic) BOOL lightGlassAppearance;
 @property (atomic) UIStackView *buttonsView;
 @property (atomic) id<DOActionMenuDelegate> delegate;
 @property (nonatomic) NSArray *actions;

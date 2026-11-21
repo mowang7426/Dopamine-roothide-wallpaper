@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface DOActionMenuButton : UIButton
 
 @property (nonatomic) BOOL bottomSeparator;
+@property (nonatomic) BOOL lightGlassAppearance;
 
 +(DOActionMenuButton*)buttonWithAction:(UIAction *)action chevron:(BOOL)chevron;
 

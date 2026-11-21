@@ -111,3 +111,72 @@
 }
 
 @end
+
+
+@interface DOLightGlassView ()
+@property (nonatomic) UIVisualEffectView *blurView;
+@property (nonatomic) UIView *tintView;
+@property (nonatomic) UIViewPropertyAnimator *blurAnimator;
+@end
+
+@implementation DOLightGlassView
+
+- (instancetype)initWithFrame:(CGRect)frame
+{
+    if ((self = [super initWithFrame:frame])) {
+        self.userInteractionEnabled = NO;
+        self.accessibilityElementsHidden = YES;
+        self.layer.cornerRadius = 20;
+        self.layer.cornerCurve = kCACornerCurveContinuous;
+        self.clipsToBounds = YES;
+        self.blurView = [[UIVisualEffectView alloc] initWithEffect:nil];
+        self.tintView = [[UIView alloc] init];
+        for (UIView *view in @[self.blurView, self.tintView]) {
+            view.frame = self.bounds;
+            view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            [self addSubview:view];
+        }
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(refreshGlass)
+            name:UIAccessibilityReduceTransparencyStatusDidChangeNotification object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(refreshGlass)
+            name:UIApplicationDidBecomeActiveNotification object:nil];
+        [self refreshGlass];
+    }
+    return self;
+}
+
+- (void)didMoveToWindow
+{
+    [super didMoveToWindow];
+    [self refreshGlass];
+}
+
+- (void)refreshGlass
+{
+    [self.blurAnimator stopAnimation:YES];
+    self.blurAnimator = nil;
+    self.blurView.effect = nil;
+    BOOL reduced = UIAccessibilityIsReduceTransparencyEnabled();
+    self.backgroundColor = reduced ? [[DOThemeManager menuColorWithAlpha:1.0] colorWithAlphaComponent:1.0] : UIColor.clearColor;
+    self.tintView.backgroundColor = reduced ? UIColor.clearColor : [UIColor colorWithWhite:1 alpha:0.065];
+    self.layer.borderWidth = 0.5;
+    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:reduced ? 0.16 : 0.32].CGColor;
+    if (!reduced && self.window) {
+        // Public API, partial light blur. Keep the effect view at alpha 1;
+        // only the two rounded card bounds sample the wallpaper behind them.
+        UIVisualEffectView *blurView = self.blurView;
+        self.blurAnimator = [[UIViewPropertyAnimator alloc] initWithDuration:1 curve:UIViewAnimationCurveLinear animations:^{
+            blurView.effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
+        }];
+        [self.blurAnimator startAnimation];
+        [self.blurAnimator pauseAnimation];
+        self.blurAnimator.fractionComplete = 0.18;
+    }
+}
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.blurAnimator stopAnimation:YES];
+}
+@end

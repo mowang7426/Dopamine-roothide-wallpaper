@@ -22,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, getter=isEnabled) BOOL enabled;
 @property (nonatomic) BOOL didExpand;
+@property (nonatomic) BOOL lightGlassAppearance;
 @property (nonatomic, assign) pthread_mutex_t canStartJailbreak;
 
 - (instancetype)initWithAction:(UIAction *)actions;

@@ -10,7 +10,29 @@
 #import "DOGlobalAppearance.h"
 #import "DOThemeManager.h"
 
+@interface DOActionMenuView ()
+@property (nonatomic) DOLightGlassView *glassView;
+@end
+
 @implementation DOActionMenuView
+
+- (void)setLightGlassAppearance:(BOOL)lightGlassAppearance
+{
+    _lightGlassAppearance = lightGlassAppearance;
+    self.backgroundColor = lightGlassAppearance ? UIColor.clearColor : [DOThemeManager menuColorWithAlpha:1.0];
+    self.layer.cornerRadius = lightGlassAppearance ? 20 : 14;
+    if (lightGlassAppearance && !self.glassView) {
+        self.glassView = [[DOLightGlassView alloc] initWithFrame:self.bounds];
+        self.glassView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [self insertSubview:self.glassView atIndex:0];
+    }
+    if (!lightGlassAppearance) {
+        [self.glassView removeFromSuperview];
+        self.glassView = nil;
+    }
+    [self refreshStack];
+}
+
 
 - (instancetype)initWithActions:(NSArray<UIAction*> *)actions delegate:(id<DOActionMenuDelegate>)delegate
 {
@@ -47,6 +69,7 @@
 
     [self.actions enumerateObjectsUsingBlock:^(UIAction *action, NSUInteger idx, BOOL *stop) {
         DOActionMenuButton *button = [DOActionMenuButton buttonWithAction:action chevron:[self.delegate actionMenuShowsChevronForAction:action]];
+        button.lightGlassAppearance = self.lightGlassAppearance;
         button.enabled = [self.delegate actionMenuActionIsEnabled:action];
         [button setBottomSeparator:idx != self.actions.count - 1];
         [self.buttonsView addArrangedSubview:button];

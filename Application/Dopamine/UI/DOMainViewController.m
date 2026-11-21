@@ -41,11 +41,10 @@
 - (void)refreshWallpaperPanelAppearance
 {
     BOOL hasWallpaper = [(DONavigationController *)self.navigationController customWallpaperActive];
-    UIColor *panelColor = hasWallpaper ? [UIColor clearColor] : [DOThemeManager menuColorWithAlpha:1.0];
-    self.actionMenuView.backgroundColor = panelColor;
+    self.actionMenuView.lightGlassAppearance = hasWallpaper;
     // The expanded jailbreak/log panel must keep its readable theme background.
     if (!self.jailbreakBtn.didExpand) {
-        self.jailbreakBtn.backgroundColor = panelColor;
+        self.jailbreakBtn.lightGlassAppearance = hasWallpaper;
     }
 }
 
