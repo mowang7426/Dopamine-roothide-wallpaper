@@ -16,8 +16,170 @@
 #import "DONavigationController.h"
 #import "DOThemeManager.h"
 #import <pthread.h>
+#import <math.h>
 #import <sys/sysctl.h>
 #import <libjailbreak/libjailbreak.h>
+
+static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCardTransparencyPercent";
+
+@interface DOCardOpacityViewController : UIViewController
+@property (nonatomic, strong) UISlider *slider;
+@property (nonatomic, strong) UILabel *valueLabel;
+@property (nonatomic, strong) UILabel *accessibilityNote;
+@property (nonatomic) CGFloat transparencyPercent;
+@property (nonatomic, copy) void (^valueChanged)(CGFloat transparencyPercent);
+@property (nonatomic, copy) void (^resetRequested)(void);
+- (instancetype)initWithTransparencyPercent:(CGFloat)percent;
+- (void)setTransparencyPercent:(CGFloat)percent;
+- (void)setReduceTransparencyEnabled:(BOOL)enabled;
+@end
+
+@implementation DOCardOpacityViewController
+
+- (instancetype)initWithTransparencyPercent:(CGFloat)percent
+{
+    if (self = [super init]) {
+        _transparencyPercent = percent;
+    }
+    return self;
+}
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+
+    UILabel *title = [[UILabel alloc] init];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    title.text = @"卡片透明度";
+    title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle2];
+    title.adjustsFontForContentSizeCategory = YES;
+
+    UIButton *done = [UIButton buttonWithType:UIButtonTypeSystem];
+    done.translatesAutoresizingMaskIntoConstraints = NO;
+    [done setTitle:@"完成" forState:UIControlStateNormal];
+    done.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    done.accessibilityHint = @"关闭卡片透明度设置";
+    [done addTarget:self action:@selector(closeSettings) forControlEvents:UIControlEventTouchUpInside];
+
+    UILabel *explanation = [[UILabel alloc] init];
+    explanation.translatesAutoresizingMaskIntoConstraints = NO;
+    explanation.text = @"滑块越大，卡片背景越透明。文字和图标颜色保持不变。";
+    explanation.numberOfLines = 0;
+    explanation.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
+    explanation.textColor = UIColor.secondaryLabelColor;
+    explanation.adjustsFontForContentSizeCategory = YES;
+
+    self.valueLabel = [[UILabel alloc] init];
+    self.valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.valueLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    self.valueLabel.adjustsFontForContentSizeCategory = YES;
+
+    self.slider = [[UISlider alloc] init];
+    self.slider.translatesAutoresizingMaskIntoConstraints = NO;
+    self.slider.minimumValue = 0;
+    self.slider.maximumValue = 100;
+    self.slider.continuous = YES;
+    self.slider.accessibilityLabel = @"卡片背景透明度";
+    self.slider.accessibilityHint = @"调整仪表盘卡片背景和边框的透明度，不会改变文字或图标";
+    [self.slider addTarget:self action:@selector(sliderChanged:) forControlEvents:UIControlEventValueChanged];
+    [self setTransparencyPercent:self.transparencyPercent];
+
+    self.accessibilityNote = [[UILabel alloc] init];
+    self.accessibilityNote.translatesAutoresizingMaskIntoConstraints = NO;
+    self.accessibilityNote.numberOfLines = 0;
+    self.accessibilityNote.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    self.accessibilityNote.textColor = UIColor.secondaryLabelColor;
+    self.accessibilityNote.adjustsFontForContentSizeCategory = YES;
+
+    UIButton *reset = [UIButton buttonWithType:UIButtonTypeSystem];
+    reset.translatesAutoresizingMaskIntoConstraints = NO;
+    [reset setTitle:@"恢复壁纸对应的默认样式" forState:UIControlStateNormal];
+    reset.accessibilityHint = @"清除已保存的透明度，恢复当前壁纸类型的默认卡片外观";
+    [reset addTarget:self action:@selector(resetSettings) forControlEvents:UIControlEventTouchUpInside];
+
+    UIStackView *content = [[UIStackView alloc] initWithArrangedSubviews:@[explanation, self.valueLabel, self.slider, self.accessibilityNote, reset]];
+    content.translatesAutoresizingMaskIntoConstraints = NO;
+    content.axis = UILayoutConstraintAxisVertical;
+    content.spacing = 18;
+    content.alignment = UIStackViewAlignmentFill;
+    UIScrollView *scroll = [[UIScrollView alloc] init];
+    scroll.translatesAutoresizingMaskIntoConstraints = NO;
+    scroll.alwaysBounceVertical = NO;
+    scroll.showsVerticalScrollIndicator = YES;
+    [self.view addSubview:title];
+    [self.view addSubview:done];
+    [self.view addSubview:scroll];
+    [scroll addSubview:content];
+    [NSLayoutConstraint activateConstraints:@[
+        [title.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:24],
+        [title.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:24],
+        [done.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-24],
+        [done.centerYAnchor constraintEqualToAnchor:title.centerYAnchor],
+        [scroll.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
+        [scroll.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
+        [scroll.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:12],
+        [scroll.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+        [content.leadingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.leadingAnchor constant:24],
+        [content.trailingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.trailingAnchor constant:-24],
+        [content.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor constant:12],
+        [content.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-12],
+        [content.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-48],
+        [self.slider.heightAnchor constraintGreaterThanOrEqualToConstant:44]
+    ]];
+    [self updateAccessibilityState:UIAccessibilityIsReduceTransparencyEnabled()];
+}
+
+- (void)setTransparencyPercent:(CGFloat)percent
+{
+    _transparencyPercent = MIN(100.0, MAX(0.0, percent));
+    if (!self.isViewLoaded) return;
+    self.slider.value = _transparencyPercent;
+    BOOL reduceTransparency = UIAccessibilityIsReduceTransparencyEnabled();
+    NSString *value = reduceTransparency
+        ? [NSString stringWithFormat:@"%.0f%% 透明（当前由系统设置覆盖）", round(_transparencyPercent)]
+        : [NSString stringWithFormat:@"%.0f%% 透明", round(_transparencyPercent)];
+    self.valueLabel.text = value;
+    self.slider.accessibilityValue = value;
+}
+
+- (void)setReduceTransparencyEnabled:(BOOL)enabled
+{
+    if (self.isViewLoaded) [self updateAccessibilityState:enabled];
+}
+
+- (void)updateAccessibilityState:(BOOL)enabled
+{
+    self.slider.enabled = !enabled;
+    NSString *value = enabled
+        ? [NSString stringWithFormat:@"%.0f%% 透明（当前由系统设置覆盖）", round(self.transparencyPercent)]
+        : [NSString stringWithFormat:@"%.0f%% 透明", round(self.transparencyPercent)];
+    self.valueLabel.text = value;
+    self.slider.accessibilityValue = value;
+    self.accessibilityNote.text = enabled
+        ? @"系统“降低透明度”已开启；为符合辅助功能设置，卡片以不透明样式显示，滑块暂不可用。"
+        : @"0% 为不透明卡片背景，100% 为完全透明。设置会自动保存并在下次启动时恢复。";
+}
+
+- (void)sliderChanged:(UISlider *)sender
+{
+    CGFloat percent = roundf(sender.value);
+    sender.value = percent;
+    [self setTransparencyPercent:percent];
+    if (self.valueChanged) self.valueChanged(percent);
+}
+
+- (void)resetSettings
+{
+    if (self.resetRequested) self.resetRequested();
+}
+
+- (void)closeSettings
+{
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+@end
 
 @interface DOMainViewController ()
 
@@ -28,6 +190,9 @@
 @property(nonatomic) BOOL hideStatusBar;
 @property(nonatomic) BOOL hideHomeIndicator;
 @property(nonatomic, strong) NSMutableArray<UIView *> *dashboardPanels;
+@property(nonatomic, strong) NSMutableArray<UIView *> *dashboardHighlightFills;
+@property(nonatomic, strong) NSMutableArray<NSNumber *> *dashboardHighlightBaseAlphas;
+@property(nonatomic, weak) DOCardOpacityViewController *opacitySettingsController;
 @property(nonatomic, strong) UIScrollView *dashboardScroll;
 @property(nonatomic, strong) UIView *dashboardTabBar;
 @property(nonatomic, strong) UIStackView *dashboardFooter;
@@ -99,20 +264,88 @@
     ]];
 }
 
+- (void)addDashboardHighlightFill:(UIView *)view baseAlpha:(CGFloat)alpha
+{
+    [self.dashboardHighlightFills addObject:view];
+    [self.dashboardHighlightBaseAlphas addObject:@(alpha)];
+}
+
+- (CGFloat)defaultCardTransparencyPercent
+{
+    // Match the existing dashboard appearance: 34% fill for custom photos,
+    // 78% fill for the built-in theme.
+    return [(DONavigationController *)self.navigationController customWallpaperActive] ? 66.0 : 22.0;
+}
+
+- (CGFloat)cardTransparencyPercent
+{
+    id saved = [NSUserDefaults.standardUserDefaults objectForKey:DODashboardCardTransparencyDefaultsKey];
+    return saved ? MIN(100.0, MAX(0.0, [saved doubleValue])) : [self defaultCardTransparencyPercent];
+}
+
+- (void)setCardTransparencyPercent:(CGFloat)percent
+{
+    CGFloat value = round(MIN(100.0, MAX(0.0, percent)));
+    [NSUserDefaults.standardUserDefaults setDouble:value forKey:DODashboardCardTransparencyDefaultsKey];
+    [self refreshWallpaperPanelAppearance];
+    [self.opacitySettingsController setTransparencyPercent:value];
+}
+
+- (void)resetCardTransparency
+{
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:DODashboardCardTransparencyDefaultsKey];
+    [self refreshWallpaperPanelAppearance];
+    [self.opacitySettingsController setTransparencyPercent:[self defaultCardTransparencyPercent]];
+}
+
+- (void)presentCardOpacitySettings
+{
+    DOCardOpacityViewController *controller = [[DOCardOpacityViewController alloc] initWithTransparencyPercent:[self cardTransparencyPercent]];
+    controller.title = @"卡片透明度";
+    controller.preferredContentSize = CGSizeMake(460, 340);
+    controller.modalPresentationStyle = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad
+        ? UIModalPresentationFormSheet : UIModalPresentationPageSheet;
+    __weak typeof(self) weakSelf = self;
+    controller.valueChanged = ^(CGFloat percent) {
+        [weakSelf setCardTransparencyPercent:percent];
+    };
+    controller.resetRequested = ^{
+        [weakSelf resetCardTransparency];
+    };
+    self.opacitySettingsController = controller;
+    [self presentViewController:controller animated:YES completion:nil];
+}
+
 - (void)refreshWallpaperPanelAppearance
 {
     BOOL wallpaper = [(DONavigationController *)self.navigationController customWallpaperActive];
     BOOL reduceTransparency = UIAccessibilityIsReduceTransparencyEnabled();
-    // Actual translucent UIKit views, never a screenshot or a full-screen veil.
-    CGFloat alpha = reduceTransparency ? 1.0 : (wallpaper ? 0.34 : 0.78);
+    CGFloat defaultPercent = [self defaultCardTransparencyPercent];
+    CGFloat transparency = reduceTransparency ? 0.0 : [self cardTransparencyPercent];
+    CGFloat relativeFill = (100.0 - transparency) / MAX(1.0, 100.0 - defaultPercent);
+    CGFloat fillAlpha = wallpaper ? 0.34 : 0.78;
+    CGFloat edgeAlpha = MIN(1.0, 0.32 * relativeFill);
+
+    // Change only card fill and edge colors; never apply alpha to a container
+    // holding labels, icons, or controls.
     for (UIView *panel in self.dashboardPanels) {
-        panel.backgroundColor = [UIColor colorWithWhite:1 alpha:alpha];
-        panel.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.32].CGColor;
+        panel.backgroundColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 1.0 : MIN(1.0, fillAlpha * relativeFill)];
+        panel.layer.borderColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 0.32 : edgeAlpha].CGColor;
+    }
+    for (NSUInteger index = 0; index < self.dashboardHighlightFills.count; index++) {
+        UIView *fill = self.dashboardHighlightFills[index];
+        CGFloat baseAlpha = self.dashboardHighlightBaseAlphas[index].doubleValue;
+        fill.backgroundColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 1.0 : MIN(1.0, baseAlpha * relativeFill)];
+    }
+    if (self.updateButton) {
+        CGFloat updateAlpha = reduceTransparency ? 1.0 : MIN(0.90, 0.90 * relativeFill);
+        self.updateButton.backgroundColor = [UIColor colorWithWhite:1 alpha:updateAlpha];
     }
     if (!self.jailbreakBtn.didExpand) {
-        self.jailbreakBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:alpha];
-        self.jailbreakBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.32].CGColor;
+        self.jailbreakBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 1.0 : MIN(1.0, fillAlpha * relativeFill)];
+        self.jailbreakBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 0.32 : edgeAlpha].CGColor;
     }
+    [self.opacitySettingsController setReduceTransparencyEnabled:reduceTransparency];
     [self setNeedsStatusBarAppearanceUpdate];
     [self.navigationController setNeedsStatusBarAppearanceUpdate];
 }
@@ -176,6 +409,7 @@
     button.accessibilityLabel = title;
     if (tag == 0) {
         button.backgroundColor = [UIColor colorWithWhite:1 alpha:0.32];
+        [self addDashboardHighlightFill:button baseAlpha:0.32];
         button.accessibilityTraits |= UIAccessibilityTraitSelected;
     }
     [button addTarget:self action:@selector(dashboardTabPressed:) forControlEvents:UIControlEventTouchUpInside];
@@ -186,6 +420,8 @@
 {
     self.view.backgroundColor = UIColor.clearColor;
     self.dashboardPanels = [NSMutableArray array];
+    self.dashboardHighlightFills = [NSMutableArray array];
+    self.dashboardHighlightBaseAlphas = [NSMutableArray array];
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
     UILayoutGuide *column = [[UILayoutGuide alloc] init];
     [self.view addLayoutGuide:column];
@@ -256,6 +492,7 @@
     UILabel *badge = [self dashboardLabel:@"D" size:21 weight:UIFontWeightBold];
     badge.textAlignment = NSTextAlignmentCenter;
     badge.backgroundColor = [UIColor colorWithWhite:1 alpha:0.32];
+    [self addDashboardHighlightFill:badge baseAlpha:0.32];
     badge.layer.cornerRadius = 12;
     badge.layer.masksToBounds = YES;
     [badge.widthAnchor constraintEqualToConstant:34].active = YES;
@@ -304,9 +541,12 @@
     };
     wallpaperMenu.configuration = wallpaperConfiguration;
     wallpaperMenu.accessibilityLabel = @"壁纸设置";
-    wallpaperMenu.accessibilityHint = @"选择原比例壁纸或恢复默认背景";
+    wallpaperMenu.accessibilityHint = @"选择原比例壁纸、恢复默认背景或调整卡片透明度";
     wallpaperMenu.showsMenuAsPrimaryAction = YES;
     wallpaperMenu.menu = [UIMenu menuWithTitle:@"壁纸 · 原比例显示" children:@[
+        [UIAction actionWithTitle:@"卡片透明度…" image:[UIImage systemImageNamed:@"slider.horizontal.3"] identifier:nil handler:^(__kindof UIAction *action) {
+            [weakSelf presentCardOpacitySettings];
+        }],
         [UIAction actionWithTitle:@"选择壁纸" image:[UIImage systemImageNamed:@"photo"] identifier:nil handler:^(__kindof UIAction *action) {
             [(DONavigationController *)weakSelf.navigationController chooseWallpaper];
         }],
@@ -362,6 +602,7 @@
     [self pinDashboardContent:details inPanel:innerCard padding:15];
     UILabel *rootHide = [self dashboardLabel:@"RootHide" size:12 weight:UIFontWeightSemibold];
     rootHide.backgroundColor = [UIColor colorWithWhite:1 alpha:0.3];
+    [self addDashboardHighlightFill:rootHide baseAlpha:0.3];
     rootHide.textAlignment = NSTextAlignmentCenter;
     rootHide.layer.cornerRadius = 9;
     rootHide.layer.masksToBounds = YES;
@@ -688,6 +929,7 @@
     self.updateButton.configuration = configuration;
     [self.dashboardFooter insertArrangedSubview:self.updateButton atIndex:0];
     [self.updateButton.heightAnchor constraintEqualToConstant:36].active = YES;
+    [self refreshWallpaperPanelAppearance];
 
 }
 
