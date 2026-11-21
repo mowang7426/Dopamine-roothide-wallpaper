@@ -22,6 +22,8 @@
     // Expansion is one-way: an accessibility/wallpaper refresh cannot blur logs.
     _lightGlassAppearance = lightGlassAppearance && !self.didExpand;
     self.button.lightGlassAppearance = _lightGlassAppearance;
+    self.alpha = _lightGlassAppearance ? 1.0 : (self.enabled ? 1.0 : 0.7);
+    self.button.alpha = _lightGlassAppearance && !self.enabled ? 0.7 : 1.0;
     self.layer.cornerRadius = _lightGlassAppearance ? 20 : 14;
     self.backgroundColor = _lightGlassAppearance ? UIColor.clearColor : [DOThemeManager menuColorWithAlpha:1.0];
     if (_lightGlassAppearance && !self.glassView) {
@@ -202,6 +204,12 @@
 - (void)setEnabled:(BOOL)enabled
 {
     self.button.userInteractionEnabled = enabled;
+    if (self.lightGlassAppearance) {
+        // Keep Reduce Transparency's fallback opaque, even when unavailable.
+        self.alpha = 1.0;
+        self.button.alpha = enabled ? 1.0 : 0.7;
+        return;
+    }
     if (enabled) {
         self.alpha = 1.0;
     } else {
