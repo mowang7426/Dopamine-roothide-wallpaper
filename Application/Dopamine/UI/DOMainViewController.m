@@ -252,7 +252,7 @@
 
     UIView *header = [self dashboardPanelWithRadius:25];
     [content addArrangedSubview:header];
-    [header.heightAnchor constraintEqualToConstant:58].active = YES;
+    [header.heightAnchor constraintGreaterThanOrEqualToConstant:58].active = YES;
     UILabel *badge = [self dashboardLabel:@"D" size:21 weight:UIFontWeightBold];
     badge.textAlignment = NSTextAlignmentCenter;
     badge.backgroundColor = [UIColor colorWithWhite:1 alpha:0.32];
@@ -260,17 +260,32 @@
     badge.layer.masksToBounds = YES;
     [badge.widthAnchor constraintEqualToConstant:34].active = YES;
     [badge.heightAnchor constraintEqualToConstant:34].active = YES;
-    UILabel *name = [self dashboardLabel:@"Dopamine" size:24 weight:UIFontWeightBold];
+    UILabel *name = [self dashboardLabel:@"多巴胺" size:24 weight:UIFontWeightBold];
+    name.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleTitle2] scaledFontForFont:name.font maximumPointSize:30];
+    name.adjustsFontForContentSizeCategory = YES;
+    // The shared label helper permits wrapping; the brand must stay on one line.
+    name.numberOfLines = 1;
+    name.adjustsFontSizeToFitWidth = YES;
+    name.minimumScaleFactor = 0.65;
+    name.baselineAdjustment = UIBaselineAdjustmentAlignCenters;
+    [name setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
+    [name setContentCompressionResistancePriority:UILayoutPriorityDefaultHigh + 1 forAxis:UILayoutConstraintAxisHorizontal];
+    [badge setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     UIStackView *brand = [[UIStackView alloc] initWithArrangedSubviews:@[badge, name]];
     brand.translatesAutoresizingMaskIntoConstraints = NO;
+    brand.axis = UILayoutConstraintAxisHorizontal;
     brand.alignment = UIStackViewAlignmentCenter;
     brand.spacing = 10;
     [header addSubview:brand];
+    // Prefer a centered brand, but let it shift before compressing on narrow screens.
+    NSLayoutConstraint *brandCenter = [brand.centerXAnchor constraintEqualToAnchor:header.centerXAnchor];
+    brandCenter.priority = UILayoutPriorityDefaultHigh;
     [NSLayoutConstraint activateConstraints:@[
-        [brand.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        brandCenter,
         [brand.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [brand.leadingAnchor constraintGreaterThanOrEqualToAnchor:header.leadingAnchor constant:12],
-        [brand.trailingAnchor constraintLessThanOrEqualToAnchor:header.trailingAnchor constant:-48]
+        [brand.topAnchor constraintGreaterThanOrEqualToAnchor:header.topAnchor constant:10],
+        [brand.bottomAnchor constraintLessThanOrEqualToAnchor:header.bottomAnchor constant:-10]
     ]];
     __weak typeof(self) weakSelf = self;
     UIButton *wallpaperMenu = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -301,6 +316,7 @@
     ]];
     [header addSubview:wallpaperMenu];
     [NSLayoutConstraint activateConstraints:@[
+        [brand.trailingAnchor constraintLessThanOrEqualToAnchor:wallpaperMenu.leadingAnchor constant:-8],
         [wallpaperMenu.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-2],
         [wallpaperMenu.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [wallpaperMenu.widthAnchor constraintEqualToConstant:44],
