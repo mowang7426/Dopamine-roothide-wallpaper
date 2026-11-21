@@ -338,7 +338,7 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
         fill.backgroundColor = [UIColor colorWithWhite:1 alpha:reduceTransparency ? 1.0 : MIN(1.0, baseAlpha * relativeFill)];
     }
     if (self.updateButton) {
-        CGFloat updateAlpha = reduceTransparency ? 1.0 : MIN(0.90, 0.90 * relativeFill);
+        CGFloat updateAlpha = reduceTransparency ? 1.0 : MIN(1.0, 0.90 * relativeFill);
         self.updateButton.backgroundColor = [UIColor colorWithWhite:1 alpha:updateAlpha];
     }
     if (!self.jailbreakBtn.didExpand) {
