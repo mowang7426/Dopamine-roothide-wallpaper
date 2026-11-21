@@ -15,6 +15,7 @@
 #import "DOLogCrashViewController.h"
 #import "DONavigationController.h"
 #import "DOThemeManager.h"
+#import "DOSettingsController.h"
 #import <pthread.h>
 #import <math.h>
 #import <sys/sysctl.h>
@@ -185,6 +186,9 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
 
 @property DOActionMenuView *actionMenuView;
 @property DOJailbreakButton *jailbreakBtn;
+@property UIView *jailbreakStatusSlot;
+@property UIView *tweakInjectionPanel;
+@property UISwitch *tweakInjectionSwitch;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
 @property DOActionMenuButton *updateButton;
 @property(nonatomic) BOOL hideStatusBar;
@@ -455,7 +459,60 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
 
     UIView *statusPlaceholder = [[UIView alloc] init];
     statusPlaceholder.translatesAutoresizingMaskIntoConstraints = NO;
-    [statusPlaceholder.heightAnchor constraintEqualToConstant:68].active = YES;
+    [statusPlaceholder.heightAnchor constraintGreaterThanOrEqualToConstant:68].active = YES;
+
+    self.jailbreakStatusSlot = [[UIView alloc] init];
+    self.jailbreakStatusSlot.translatesAutoresizingMaskIntoConstraints = NO;
+    self.tweakInjectionPanel = [self dashboardPanelWithRadius:22];
+    NSLayoutConstraint *injectionPanelWidth = [self.tweakInjectionPanel.widthAnchor constraintEqualToConstant:126];
+    injectionPanelWidth.priority = UILayoutPriorityDefaultHigh;
+    injectionPanelWidth.active = YES;
+    // UIStackView collapses hidden arranged subviews to zero width.
+    NSLayoutConstraint *injectionPanelMinimumWidth = [self.tweakInjectionPanel.widthAnchor constraintGreaterThanOrEqualToConstant:96];
+    injectionPanelMinimumWidth.priority = UILayoutPriorityDefaultHigh;
+    injectionPanelMinimumWidth.active = YES;
+    [self.tweakInjectionPanel.heightAnchor constraintGreaterThanOrEqualToConstant:68].active = YES;
+
+    UILabel *tweakInjectionLabel = [self dashboardLabel:@"插件注入" size:12 weight:UIFontWeightSemibold];
+    tweakInjectionLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    tweakInjectionLabel.adjustsFontForContentSizeCategory = YES;
+    tweakInjectionLabel.textAlignment = NSTextAlignmentCenter;
+    self.tweakInjectionSwitch = [[UISwitch alloc] init];
+    self.tweakInjectionSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.tweakInjectionSwitch.accessibilityLabel = @"插件注入";
+    self.tweakInjectionSwitch.accessibilityHint = @"切换现有插件注入设置；更改需重新启动用户空间后生效。";
+    [self.tweakInjectionSwitch addTarget:self action:@selector(dashboardTweakInjectionChanged:) forControlEvents:UIControlEventValueChanged];
+    UIStackView *injectionContents = [[UIStackView alloc] initWithArrangedSubviews:@[tweakInjectionLabel, self.tweakInjectionSwitch]];
+    injectionContents.translatesAutoresizingMaskIntoConstraints = NO;
+    injectionContents.axis = UILayoutConstraintAxisVertical;
+    injectionContents.alignment = UIStackViewAlignmentCenter;
+    injectionContents.spacing = 2;
+    [self.tweakInjectionPanel addSubview:injectionContents];
+    NSLayoutConstraint *injectionLeading = [injectionContents.leadingAnchor constraintEqualToAnchor:self.tweakInjectionPanel.leadingAnchor constant:6];
+    NSLayoutConstraint *injectionTrailing = [injectionContents.trailingAnchor constraintEqualToAnchor:self.tweakInjectionPanel.trailingAnchor constant:-6];
+    injectionLeading.priority = UILayoutPriorityDefaultHigh;
+    injectionTrailing.priority = UILayoutPriorityDefaultHigh;
+    [NSLayoutConstraint activateConstraints:@[
+        injectionLeading, injectionTrailing,
+        [injectionContents.centerXAnchor constraintEqualToAnchor:self.tweakInjectionPanel.centerXAnchor],
+        [injectionContents.topAnchor constraintEqualToAnchor:self.tweakInjectionPanel.topAnchor constant:6],
+        [injectionContents.bottomAnchor constraintEqualToAnchor:self.tweakInjectionPanel.bottomAnchor constant:-6]
+    ]];
+
+    UIStackView *statusRow = [[UIStackView alloc] initWithArrangedSubviews:@[self.jailbreakStatusSlot, self.tweakInjectionPanel]];
+    statusRow.translatesAutoresizingMaskIntoConstraints = NO;
+    statusRow.axis = UILayoutConstraintAxisHorizontal;
+    statusRow.alignment = UIStackViewAlignmentFill;
+    statusRow.distribution = UIStackViewDistributionFill;
+    statusRow.spacing = 10;
+    [statusPlaceholder addSubview:statusRow];
+    [NSLayoutConstraint activateConstraints:@[
+        [statusRow.leadingAnchor constraintEqualToAnchor:statusPlaceholder.leadingAnchor],
+        [statusRow.trailingAnchor constraintEqualToAnchor:statusPlaceholder.trailingAnchor],
+        [statusRow.topAnchor constraintEqualToAnchor:statusPlaceholder.topAnchor],
+        [statusRow.bottomAnchor constraintEqualToAnchor:statusPlaceholder.bottomAnchor]
+    ]];
+
     self.dashboardFooter = [self dashboardStack:@[statusPlaceholder] spacing:8];
     [self.view addSubview:self.dashboardFooter];
     [NSLayoutConstraint activateConstraints:@[
@@ -638,10 +695,10 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
     self.jailbreakBtn.button.configuration = statusConfig;
     [self.view addSubview:self.jailbreakBtn];
     self.jailbreakButtonConstraints = @[
-        [self.jailbreakBtn.leadingAnchor constraintEqualToAnchor:statusPlaceholder.leadingAnchor],
-        [self.jailbreakBtn.trailingAnchor constraintEqualToAnchor:statusPlaceholder.trailingAnchor],
-        [self.jailbreakBtn.topAnchor constraintEqualToAnchor:statusPlaceholder.topAnchor],
-        [self.jailbreakBtn.bottomAnchor constraintEqualToAnchor:statusPlaceholder.bottomAnchor]
+        [self.jailbreakBtn.leadingAnchor constraintEqualToAnchor:self.jailbreakStatusSlot.leadingAnchor],
+        [self.jailbreakBtn.trailingAnchor constraintEqualToAnchor:self.jailbreakStatusSlot.trailingAnchor],
+        [self.jailbreakBtn.topAnchor constraintEqualToAnchor:self.jailbreakStatusSlot.topAnchor],
+        [self.jailbreakBtn.bottomAnchor constraintEqualToAnchor:self.jailbreakStatusSlot.bottomAnchor]
     ];
     [NSLayoutConstraint activateConstraints:self.jailbreakButtonConstraints];
     [self refreshDashboardValues];
@@ -662,13 +719,25 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
     } else if ([notification.name isEqualToString:UIApplicationDidEnterBackgroundNotification]) {
         [self stopDashboardTimer];
     } else if ([notification.name isEqualToString:UIApplicationDidBecomeActiveNotification]) {
+        [self refreshDashboardValues];
         [self startDashboardTimer];
     }
+}
+
+- (void)dashboardTweakInjectionChanged:(UISwitch *)sender
+{
+    if (![[DOEnvironmentManager sharedManager] isJailbroken] || self.jailbreakBtn.didExpand || self.presentedViewController) {
+        sender.on = [DOSettingsController tweakInjectionEnabledForDashboard];
+        return;
+    }
+    [DOSettingsController setTweakInjectionEnabledFromDashboard:sender.isOn presentingController:self];
+    sender.on = [DOSettingsController tweakInjectionEnabledForDashboard];
 }
 
 - (void)refreshDashboardValues
 {
     DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    self.tweakInjectionSwitch.on = [DOSettingsController tweakInjectionEnabledForDashboard];
     self.supportLabel.text = [environment versionSupportString];
     self.systemVersionLabel.text = [environment systemVersion] ?: UIDevice.currentDevice.systemVersion;
     NSString *baseVersion = [environment jailbrokenVersion];
@@ -676,6 +745,7 @@ static NSString * const DODashboardCardTransparencyDefaultsKey = @"DODashboardCa
     self.versionLabel.text = baseVersion.length && rootVersion.length ? [NSString stringWithFormat:@"%@-%@", baseVersion, rootVersion] : [environment appVersion];
     [self updateDashboardUptime];
     BOOL jailbroken = [environment isJailbroken];
+    [self.tweakInjectionPanel setHidden:!jailbroken];
     self.respringShortcut.enabled = jailbroken;
     self.userspaceShortcut.enabled = jailbroken;
     if (!self.jailbreakBtn.didExpand) {

@@ -22,7 +22,7 @@
 #import "DOButtonCell.h"
 
 @interface DOSettingsController ()
-
++ (void)applyTweakInjectionEnabled:(BOOL)enabled presentingController:(UIViewController *)presenter;
 @end
 
 @implementation DOSettingsController
@@ -477,29 +477,43 @@
 
 - (id)readTweakInjectionEnabled:(PSSpecifier *)specifier
 {
-    DOEnvironmentManager *envManager = [DOEnvironmentManager sharedManager];
-    if (envManager.isJailbroken) {
-        return @([DOEnvironmentManager sharedManager].isTweakInjectionEnabled);
-    }
-    return [self readPreferenceValue:specifier];
+    return @([DOSettingsController tweakInjectionEnabledForDashboard]);
 }
 
 - (void)setTweakInjectionEnabled:(id)value specifier:(PSSpecifier *)specifier
 {
     [self setPreferenceValue:value specifier:specifier];
+    [DOSettingsController applyTweakInjectionEnabled:((NSNumber *)value).boolValue presentingController:self];
+}
+
++ (BOOL)tweakInjectionEnabledForDashboard
+{
     DOEnvironmentManager *envManager = [DOEnvironmentManager sharedManager];
-    if (envManager.isJailbroken) {
-        [[DOEnvironmentManager sharedManager] setTweakInjectionEnabled:((NSNumber *)value).boolValue];
-        UIAlertController *userspaceRebootAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Title") message:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Body") preferredStyle:UIAlertControllerStyleAlert];
-        UIAlertAction *rebootNowAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Reboot_Now") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-            [[DOEnvironmentManager sharedManager] rebootUserspace];
-        }];
-        UIAlertAction *rebootLaterAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Reboot_Later") style:UIAlertActionStyleCancel handler:nil];
-        
-        [userspaceRebootAlertController addAction:rebootNowAction];
-        [userspaceRebootAlertController addAction:rebootLaterAction];
-        [self presentViewController:userspaceRebootAlertController animated:YES completion:nil];
-    }
+    if (envManager.isJailbroken) return envManager.isTweakInjectionEnabled;
+    id value = [[DOPreferenceManager sharedManager] preferenceValueForKey:@"tweakInjectionEnabled"];
+    return value ? [value boolValue] : YES;
+}
+
++ (void)setTweakInjectionEnabledFromDashboard:(BOOL)enabled presentingController:(UIViewController *)presenter
+{
+    [[DOPreferenceManager sharedManager] setPreferenceValue:@(enabled) forKey:@"tweakInjectionEnabled"];
+    [self applyTweakInjectionEnabled:enabled presentingController:presenter];
+}
+
++ (void)applyTweakInjectionEnabled:(BOOL)enabled presentingController:(UIViewController *)presenter
+{
+    DOEnvironmentManager *envManager = [DOEnvironmentManager sharedManager];
+    if (!envManager.isJailbroken) return;
+
+    [envManager setTweakInjectionEnabled:enabled];
+    UIAlertController *userspaceRebootAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Title") message:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Body") preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *rebootNowAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Reboot_Now") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [[DOEnvironmentManager sharedManager] rebootUserspace];
+    }];
+    UIAlertAction *rebootLaterAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Alert_Tweak_Injection_Toggled_Reboot_Later") style:UIAlertActionStyleCancel handler:nil];
+    [userspaceRebootAlertController addAction:rebootNowAction];
+    [userspaceRebootAlertController addAction:rebootLaterAction];
+    [presenter presentViewController:userspaceRebootAlertController animated:YES completion:nil];
 }
 
 - (id)readAppJITEnabled:(PSSpecifier *)specifier
